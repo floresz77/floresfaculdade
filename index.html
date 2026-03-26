@@ -318,9 +318,7 @@ footer a:hover{text-decoration:underline;}
   .fcard-pts .pnum{font-size:28px !important;}
 }
 </style>
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 </head>
 <body>
 
@@ -849,9 +847,7 @@ footer a:hover{text-decoration:underline;}
   </div>
 </div>
 
-<div id="sync-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10000;background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;text-align:center;padding:8px;font-size:13px;font-weight:700;font-family:Raleway,sans-serif">
-  Sincronizando dados... aguarde um momento
-</div>
+
 <div id="toast"></div>
 <footer>
   <span class="flogo">Pele Nua Moda</span>
@@ -860,25 +856,7 @@ footer a:hover{text-decoration:underline;}
 </footer>
 
 <script>
-// ═══ FIREBASE ═══
-var firebaseConfig = {
-  apiKey: "AIzaSyAupLDG7re0aLTk-cWQT6tTqFBJMsnWWWQ",
-  authDomain: "pelenuamodaefit.firebaseapp.com",
-  projectId: "pelenuamodaefit",
-  storageBucket: "pelenuamodaefit.firebasestorage.app",
-  messagingSenderId: "451520195371",
-  appId: "1:451520195371:web:d18b11e59bbd67f06cb36e"
-};
-firebase.initializeApp(firebaseConfig);
-var db = firebase.firestore();
-
-function fsSet(col,id,data){db.collection(col).doc(String(id)).set(data).catch(function(e){console.warn(e);});}
-function fsDel(col,id){db.collection(col).doc(String(id)).delete().catch(function(e){console.warn(e);});}
-function fsGet(col,cb){
-  db.collection(col).get()
-    .then(function(s){var a=[];s.forEach(function(d){a.push(d.data());});cb(a);})
-    .catch(function(e){console.warn(e);cb([]);});
-}
+// ═══ DADOS ═══
 
 // ═══ DEFAULTS ═══
 function dProds(){return[
@@ -942,60 +920,12 @@ var confirmCb=null,avMode="user",editSlId=null,rwIdx=-1;
 
 // ═══ SAVE HELPERS ═══
 function saveLS(k,v){localStorage.setItem(k,JSON.stringify(v));}
-function saveProds(){
-  saveLS("pnm_prods",prods);
-  // First delete ALL existing docs, then re-save current list
-  // This ensures deleted products are truly removed from Firestore
-  db.collection("pnm_prods").get().then(function(snap){
-    var batch=db.batch();
-    // Delete all existing
-    snap.forEach(function(d){batch.delete(d.ref);});
-    // Re-add current products
-    prods.forEach(function(p){batch.set(db.collection("pnm_prods").doc(String(p.id)),p);});
-    return batch.commit();
-  }).then(bumpVersion).catch(function(e){console.warn(e);});
-}
-function saveAdult(){
-  saveLS("pnm_adult",aProds);
-  db.collection("pnm_adult").get().then(function(snap){
-    var batch=db.batch();
-    snap.forEach(function(d){batch.delete(d.ref);});
-    aProds.forEach(function(p){batch.set(db.collection("pnm_adult").doc(String(p.id)),p);});
-    return batch.commit();
-  }).then(bumpVersion).catch(function(e){console.warn(e);});
-}
-function saveUsers(){
-  saveLS("pnm_users",users);
-  db.collection("pnm_users").get().then(function(snap){
-    var batch=db.batch();
-    snap.forEach(function(d){batch.delete(d.ref);});
-    users.forEach(function(u){batch.set(db.collection("pnm_users").doc(String(u.email)),u);});
-    return batch.commit();
-  }).then(bumpVersion).catch(function(e){console.warn(e);});
-}
-function saveSlides(){
-  saveLS("pnm_slides",slides);
-  db.collection("pnm_slides").get().then(function(snap){
-    var batch=db.batch();
-    snap.forEach(function(d){batch.delete(d.ref);});
-    slides.forEach(function(s){batch.set(db.collection("pnm_slides").doc(String(s.id)),s);});
-    return batch.commit();
-  }).then(bumpVersion).catch(function(e){console.warn(e);});
-}
-function saveRewards(){
-  saveLS("pnm_rewards",rewards);
-  db.collection("pnm_rewards").get().then(function(snap){
-    var batch=db.batch();
-    snap.forEach(function(d){batch.delete(d.ref);});
-    rewards.forEach(function(r){batch.set(db.collection("pnm_rewards").doc(String(r.id)),r);});
-    return batch.commit();
-  }).then(bumpVersion).catch(function(e){console.warn(e);});
-}
-function saveCfg(key,val){
-  localStorage.setItem("pnm_"+key,typeof val==="string"?val:JSON.stringify(val));
-  db.collection("pnm_config").doc(key).set({key:key,value:val})
-    .then(bumpVersion).catch(function(e){console.warn(e);});
-}
+function saveProds(){saveLS("pnm_prods",prods);}
+function saveAdult(){saveLS("pnm_adult",aProds);}
+function saveUsers(){saveLS("pnm_users",users);}
+function saveSlides(){saveLS("pnm_slides",slides);}
+function saveRewards(){saveLS("pnm_rewards",rewards);}
+function saveCfg(key,val){localStorage.setItem("pnm_"+key,typeof val==="string"?val:JSON.stringify(val));}
 
 // ═══ UTILS ═══
 function openM(id){document.getElementById(id).classList.add("open");}
@@ -1077,118 +1007,7 @@ function showV(id){
   });
 }
 
-// ═══ FIREBASE SYNC ═══
-var _syncTimer=null;
-var _localVer=0;
 
-// Bump version on Firebase whenever data changes — others detect it and reload
-function bumpVersion(){
-  fsSet("pnm_config","version",{key:"version",value:Date.now()});
-}
-
-function initFirebase(){
-  // First load — pull everything from Firebase into localStorage, then render once
-  fsGet("pnm_prods",function(arr){
-    if(arr.length){prods=arr;saveLS("pnm_prods",prods);}
-    else if(!localStorage.getItem("pnm_seeded")){
-      // First ever visit - seed defaults
-      localStorage.setItem("pnm_seeded","1");
-      dProds().forEach(function(p){fsSet("pnm_prods",p.id,p);});
-    } else {
-      // Manager deleted all products intentionally
-      prods=[];saveLS("pnm_prods",prods);
-    }
-    renderH();renderP();updStats();
-  });
-  fsGet("pnm_adult",function(arr){
-    if(arr.length){aProds=arr;saveLS("pnm_adult",aProds);}
-    else{dAdult().forEach(function(p){fsSet("pnm_adult",p.id,p);});}
-    renderA();
-  });
-  fsGet("pnm_users",function(arr){
-    if(arr.length){
-      users=arr;saveLS("pnm_users",users);
-      if(curUser){
-        for(var i=0;i<users.length;i++){
-          if(users[i].email===curUser.email&&users[i].senha===curUser.senha){curUser=users[i];break;}
-        }
-        localStorage.setItem("pnm_user",JSON.stringify(curUser));
-      }
-    }
-    updStats();renderUsers();
-  });
-  fsGet("pnm_slides",function(arr){
-    if(arr.length){slides=arr.sort(function(a,b){return a.id-b.id;});saveLS("pnm_slides",slides);}
-    else{dSlides().forEach(function(s){fsSet("pnm_slides",s.id,s);});}
-    renderSS();resetST();
-  });
-  fsGet("pnm_rewards",function(arr){
-    if(arr.length){rewards=arr;saveLS("pnm_rewards",rewards);}
-    else{dRewards().forEach(function(r){fsSet("pnm_rewards",r.id,r);});}
-    renderRewardsGrid();
-  });
-  fsGet("pnm_config",function(arr){
-    arr.forEach(function(item){
-      if(item.key==="trocas"&&item.value){trocasTxt=item.value;localStorage.setItem("pnm_trocas",trocasTxt);}
-      if(item.key==="homecats"&&item.value){homeCats=item.value;saveLS("pnm_homecats",homeCats);}
-      if(item.key==="mgravatar"&&item.value){mgrAvatar=item.value;localStorage.setItem("pnm_mgrav",mgrAvatar);applyMgrAvatar();}
-      if(item.key==="version"&&item.value){_localVer=item.value;}
-    });
-    renderHomeCats();
-  });
-
-  // Poll version every 8 seconds — only reload data if version changed (no UI flicker)
-  _syncTimer=setInterval(function(){
-    db.collection("pnm_config").doc("version").get()
-      .then(function(doc){
-        if(!doc.exists)return;
-        var remoteVer=doc.data().value||0;
-        if(remoteVer<=_localVer)return;
-        _localVer=remoteVer;
-        // Something changed — fetch and update UI smoothly
-        fsGet("pnm_prods",function(arr){
-          // Always replace local data with Firebase data (even if empty = all deleted)
-          prods=arr;saveLS("pnm_prods",prods);
-          renderH();renderP();updStats();
-          if(mgrLogged)renderProdTbl();
-        });
-        fsGet("pnm_adult",function(arr){
-          aProds=arr;saveLS("pnm_adult",aProds);
-          if(document.getElementById("page-adult").classList.contains("active"))renderA();
-        });
-        fsGet("pnm_users",function(arr){
-          if(!arr.length)return;
-          users=arr;saveLS("pnm_users",users);
-          if(curUser){
-            for(var i=0;i<users.length;i++){
-              if(users[i].email===curUser.email&&users[i].senha===curUser.senha){
-                curUser=users[i];localStorage.setItem("pnm_user",JSON.stringify(curUser));break;
-              }
-            }
-          }
-          updStats();
-          if(mgrLogged)renderUsers();
-        });
-        fsGet("pnm_slides",function(arr){
-          slides=arr.sort(function(a,b){return a.id-b.id;});saveLS("pnm_slides",slides);
-          if(document.getElementById("page-home").classList.contains("active")){renderSS();resetST();}
-        });
-        fsGet("pnm_rewards",function(arr){
-          if(!arr.length)return;
-          rewards=arr;saveLS("pnm_rewards",rewards);
-          renderRewardsGrid();
-        });
-        fsGet("pnm_config",function(arr){
-          arr.forEach(function(item){
-            if(item.key==="trocas"&&item.value){trocasTxt=item.value;localStorage.setItem("pnm_trocas",trocasTxt);
-              if(document.getElementById("page-trocas").classList.contains("active"))renderTrocas();}
-            if(item.key==="homecats"&&item.value){homeCats=item.value;saveLS("pnm_homecats",homeCats);renderHomeCats();}
-            if(item.key==="mgravatar"&&item.value){mgrAvatar=item.value;localStorage.setItem("pnm_mgrav",mgrAvatar);applyMgrAvatar();}
-          });
-        });
-      }).catch(function(e){console.warn("poll:",e);});
-  },8000);
-}
 function applyMgrAvatar(){
   var ma=document.getElementById("mgr-av");
   if(ma&&mgrAvatar)ma.innerHTML="<img src=\""+mgrAvatar+"\" style=\"width:100%;height:100%;object-fit:cover\">";
@@ -1259,7 +1078,7 @@ function delSlide(id){
   showConfirm("Remover Slide","Tem certeza?",function(){
     slides=slides.filter(function(x){return x.id!==id;});
     if(curSlide>=slides.length)curSlide=Math.max(0,slides.length-1);
-    fsDel("pnm_slides",id);saveSlides();renderSS();resetST();renderMgrSlides();
+    saveSlides();renderSS();resetST();renderMgrSlides();
     showToast("Slide removido.");
   });
 }
@@ -1446,7 +1265,7 @@ function addProd(){
 function delProd(id){
   showConfirm("Remover Produto","Tem certeza? Esta ação não pode ser desfeita.",function(){
     prods=prods.filter(function(p){return p.id!==id;});
-    fsDel("pnm_prods",id);saveProds();renderH();renderP();renderProdTbl();updStats();
+    saveProds();renderH();renderP();renderProdTbl();updStats();
     showToast("Produto removido.");
   });
 }
@@ -1579,64 +1398,25 @@ function registerUser(){
   if(senha!==senha2){showToast("Senhas não coincidem!");return;}
   if(senha.length<8){showToast("Senha: mín. 8 caracteres!");return;}
   if(data){var ag=(new Date()-new Date(data))/(1000*60*60*24*365.25);if(ag<18){showToast("Necessário 18+ anos!");return;}}
-  showToast("⏳ Verificando cadastro...");
-  // Check Firebase directly for duplicate email or CPF
-  db.collection("pnm_users").get().then(function(snap){
-    var allUsers=[];snap.forEach(function(d){allUsers.push(d.data());});
-    // merge with local
-    allUsers.forEach(function(u){
-      var found=false;for(var i=0;i<users.length;i++){if(users[i].email===u.email){users[i]=u;found=true;break;}}
-      if(!found)users.push(u);
-    });
-    saveLS("pnm_users",users);
-    for(var i=0;i<users.length;i++){
-      if(users[i].email===email){showToast("❌ E-mail já cadastrado!");return;}
-      if(users[i].cpf&&users[i].cpf===cpf){showToast("❌ CPF já cadastrado!");return;}
-    }
-    var u={nome:nome,sob:sob,email:email,cpf:cpf,senha:senha,tel:tel,addr:addr,data:data,
-           pts:0,lastDaily:null,fidNick:"Membro",fidBg:null,avatar:null};
-    users.push(u);saveUsers();
-    curUser=u;localStorage.setItem("pnm_user",JSON.stringify(u));
-    showToast("🎉 Bem-vinda, "+nome+"!");renderAcc();
-  }).catch(function(e){
-    console.warn(e);
-    // Fallback to local check
-    for(var i=0;i<users.length;i++){
-      if(users[i].email===email){showToast("❌ E-mail já cadastrado!");return;}
-    }
-    var u={nome:nome,sob:sob,email:email,cpf:cpf,senha:senha,tel:tel,addr:addr,data:data,
-           pts:0,lastDaily:null,fidNick:"Membro",fidBg:null,avatar:null};
-    users.push(u);saveUsers();
-    curUser=u;localStorage.setItem("pnm_user",JSON.stringify(u));
-    showToast("🎉 Bem-vinda, "+nome+"!");renderAcc();
-  });
-}
+  for(var i=0;i<users.length;i++){
+    if(users[i].email===email){showToast("❌ E-mail já cadastrado!");return;}
+    if(users[i].cpf&&users[i].cpf===cpf){showToast("❌ CPF já cadastrado!");return;}
+  }
+  var u={nome:nome,sob:sob,email:email,cpf:cpf,senha:senha,tel:tel,addr:addr,data:data,
+         pts:0,lastDaily:null,fidNick:"Membro",fidBg:null,avatar:null};
+  users.push(u);saveUsers();
+  curUser=u;localStorage.setItem("pnm_user",JSON.stringify(u));
+  showToast("🎉 Bem-vinda, "+nome+"!");renderAcc();
+  }
 function loginUser(){
   var email=document.getElementById("l-email").value.trim();
   var senha=document.getElementById("l-senha").value;
   if(!email||!senha){showToast("Preencha os campos!");return;}
-  showToast("⏳ Entrando...");
-  // Always check Firebase to catch accounts created on other devices
-  db.collection("pnm_users").doc(email).get().then(function(doc){
-    if(!doc.exists){showToast("❌ E-mail ou senha incorretos!");return;}
-    var u=doc.data();
-    if(u.senha!==senha){showToast("❌ E-mail ou senha incorretos!");return;}
-    // Merge into local users array
-    var found=false;
-    for(var i=0;i<users.length;i++){if(users[i].email===email){users[i]=u;found=true;break;}}
-    if(!found)users.push(u);
-    saveLS("pnm_users",users);
-    curUser=u;localStorage.setItem("pnm_user",JSON.stringify(u));
-    showToast("💕 Bem-vinda, "+curUser.nome+"!");renderAcc();
-  }).catch(function(e){
-    console.warn(e);
-    // Fallback to local
-    var found=null;
-    for(var i=0;i<users.length;i++){if(users[i].email===email&&users[i].senha===senha){found=users[i];break;}}
-    if(!found){showToast("❌ E-mail ou senha incorretos!");return;}
-    curUser=found;localStorage.setItem("pnm_user",JSON.stringify(curUser));
-    showToast("💕 Bem-vinda, "+curUser.nome+"!");renderAcc();
-  });
+  var found=null;
+  for(var i=0;i<users.length;i++){if(users[i].email===email&&users[i].senha===senha){found=users[i];break;}}
+  if(!found){showToast("❌ E-mail ou senha incorretos!");return;}
+  curUser=found;localStorage.setItem("pnm_user",JSON.stringify(curUser));
+  showToast("💕 Bem-vinda, "+curUser.nome+"!");renderAcc();
 }
 function logoutUser(){curUser=null;localStorage.removeItem("pnm_user");renderAcc();showToast("Até logo! 👋");}
 
@@ -1761,7 +1541,7 @@ function saveReward(){
 }
 function delReward(i){
   showConfirm("Remover Brinde","Remover esta recompensa?",function(){
-    var id=rewards[i].id;rewards.splice(i,1);fsDel("pnm_rewards",id);
+    rewards.splice(i,1);
     saveRewards();renderRewardsList();renderRewardsGrid();showToast("Recompensa removida.");
   });
 }
@@ -1845,7 +1625,7 @@ function saveTrocas(){trocasTxt=document.getElementById("trocas-txt").value;save
   document.getElementById("fav-n").textContent=favs.length;
   applyMgrAvatar();
   renderH();renderSS();resetST();
-  initFirebase();
+  renderH();renderSS();resetST();renderP();renderA();updStats();
 }());
 </script>
 </body>
