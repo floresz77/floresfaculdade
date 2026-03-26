@@ -1058,51 +1058,47 @@ function showV(id){
 }
 
 // ═══ FIREBASE SYNC ═══
+// Loads data from Firebase ONCE on page load, silently updates localStorage cache
+// UI is NEVER re-rendered by Firebase - only by user actions
 function initFirebase(){
-  // Load products
+  var lastSync=parseInt(localStorage.getItem("pnm_lastsync")||"0");
+  var now=Date.now();
+  // Only sync from Firebase if last sync was more than 30 seconds ago
+  if(now-lastSync < 30000) return;
+  localStorage.setItem("pnm_lastsync",String(now));
+
   fsGet("pnm_prods",function(arr){
     if(arr.length){prods=arr;saveLS("pnm_prods",prods);}
     else{dProds().forEach(function(p){fsSet("pnm_prods",p.id,p);});}
-    renderH();renderP();updStats();
   });
-  // Load adult products
   fsGet("pnm_adult",function(arr){
     if(arr.length){aProds=arr;saveLS("pnm_adult",aProds);}
     else{dAdult().forEach(function(p){fsSet("pnm_adult",p.id,p);});}
-    renderA();
   });
-  // Load users
   fsGet("pnm_users",function(arr){
-    if(arr.length){
-      users=arr;saveLS("pnm_users",users);
-      if(curUser){
-        for(var i=0;i<users.length;i++){
-          if(users[i].email===curUser.email&&users[i].senha===curUser.senha){curUser=users[i];break;}
-        }
-        localStorage.setItem("pnm_user",JSON.stringify(curUser));
+    if(!arr.length)return;
+    users=arr;saveLS("pnm_users",users);
+    if(curUser){
+      for(var i=0;i<users.length;i++){
+        if(users[i].email===curUser.email&&users[i].senha===curUser.senha){curUser=users[i];break;}
       }
+      localStorage.setItem("pnm_user",JSON.stringify(curUser));
     }
-    updStats();
   });
-  // Load slides
   fsGet("pnm_slides",function(arr){
     if(arr.length){slides=arr.sort(function(a,b){return a.id-b.id;});saveLS("pnm_slides",slides);}
     else{dSlides().forEach(function(s){fsSet("pnm_slides",s.id,s);});}
-    renderSS();resetST();
   });
-  // Load rewards
   fsGet("pnm_rewards",function(arr){
     if(arr.length){rewards=arr;saveLS("pnm_rewards",rewards);}
     else{dRewards().forEach(function(r){fsSet("pnm_rewards",r.id,r);});}
   });
-  // Load config
   fsGet("pnm_config",function(arr){
     arr.forEach(function(item){
-      if(item.key==="trocas"&&item.value){trocasTxt=item.value;localStorage.setItem("pnm_trocas",trocasTxt);}
+      if(item.key==="trocas"&&item.value)  {trocasTxt=item.value;localStorage.setItem("pnm_trocas",trocasTxt);}
       if(item.key==="homecats"&&item.value){homeCats=item.value;saveLS("pnm_homecats",homeCats);}
-      if(item.key==="mgravatar"&&item.value){mgrAvatar=item.value;localStorage.setItem("pnm_mgrav",mgrAvatar);applyMgrAvatar();}
+      if(item.key==="mgravatar"&&item.value){mgrAvatar=item.value;localStorage.setItem("pnm_mgrav",mgrAvatar);}
     });
-    renderHomeCats();
   });
 }
 function applyMgrAvatar(){
